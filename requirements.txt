@@ -1,0 +1,11 @@
+streamlit
+numpy
+sentence-transformers
+langchain-huggingface
+langchain-community
+langchain-text-splitters
+faiss-cpu
+pypdf
+openai>=1.40.0
+scikit-learn
+python-dotenv
