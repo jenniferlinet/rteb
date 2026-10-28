@@ -1,7 +1,7 @@
 # Deploy on Streamlit Community Cloud
 
 1. Sign in at [share.streamlit.io](https://share.streamlit.io) with GitHub.
-2. **Create app** → Repository: `jenniferlinet/rteb` → Branch: `main` → Main file: `main.py`.
+2. **Create app** → Repository: `jenniferlinet/rteb` → Branch: `main` → Main file: **`main.py`** (repo root — not `main/main.py`).
 3. **Advanced settings → Secrets:**
 
 ```toml

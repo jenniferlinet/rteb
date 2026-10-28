@@ -1,10 +1,8 @@
 import re
-import hashlib
 import streamlit as st
 import numpy as np
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.document_loaders import PyPDFLoader
-from langchain_community.vectorstores import FAISS
 from sentence_transformers import CrossEncoder
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
@@ -125,39 +123,6 @@ def get_embedding_model():
 
 def get_reranker():
     return load_reranker()
-
-
-# -------------------------------------------------------------
-# FAISS Index
-# -------------------------------------------------------------
-def faiss_index_path(_pdf_fp):
-    digest = hashlib.sha256(_pdf_fp.encode()).hexdigest()[:12]
-    return f"./dbs/documentation/faiss_{digest}"
-
-
-@st.cache_resource
-def get_faiss_index(_pdf_fp):
-    if _pdf_fp == "missing":
-        return None
-
-    index_path = faiss_index_path(_pdf_fp)
-    if os.path.exists(index_path):
-        try:
-            return FAISS.load_local(
-                index_path,
-                get_embedding_model(),
-                allow_dangerous_deserialization=True,
-            )
-        except Exception:
-            pass
-
-    if DOC_TEXTS:
-        db = FAISS.from_texts(DOC_TEXTS, get_embedding_model())
-        os.makedirs(os.path.dirname(index_path), exist_ok=True)
-        db.save_local(index_path)
-        return db
-
-    return None
 
 
 # -------------------------------------------------------------
