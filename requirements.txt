@@ -1,11 +1,14 @@
-streamlit
-numpy
-sentence-transformers
-langchain-huggingface
-langchain-community
-langchain-text-splitters
-faiss-cpu
-pypdf
-openai>=1.40.0
-scikit-learn
-python-dotenv
+streamlit>=1.32.0
+numpy>=1.24.0,<2.0.0
+sentence-transformers>=2.6.0
+langchain-huggingface>=0.1.0
+langchain-community>=0.2.0
+langchain-text-splitters>=0.2.0
+langchain-core>=0.2.0
+faiss-cpu>=1.7.4
+pypdf>=4.0.0
+transformers>=4.40.0
+scikit-learn>=1.3.0
+python-dotenv>=1.0.0
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch>=2.2.0,<2.5.0

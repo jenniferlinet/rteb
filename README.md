@@ -1,8 +1,11 @@
 # 🔍 RTEB Retrieval Dashboard
 
-> **Hybrid Information Retrieval with LLM-Based Relevance Evaluation**
+> **Hybrid PDF retrieval — TF-IDF, semantic search, and cross-encoder reranking**
 
-A complete retrieval + evaluation pipeline that combines keyword search, semantic embeddings, and GPT-4.1-powered relevance scoring — all in an interactive Streamlit dashboard.
+Interactive Streamlit app: upload a PDF, compare **Keyword**, **Semantic**, and **Hybrid** retrieval, and read **extractive answer summaries** grounded in the document.
+
+**Live demo:** *(add your Streamlit URL after deploy — see [DEPLOY.md](DEPLOY.md))*  
+**Source:** [github.com/jenniferlinet/rteb](https://github.com/jenniferlinet/rteb)
 
 ---
 
