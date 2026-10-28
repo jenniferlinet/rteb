@@ -1,165 +1,269 @@
 # RTEB Retrieval Dashboard
 
-**Hybrid PDF search** — compare **Keyword (TF-IDF)**, **Semantic (embeddings)**, and **Hybrid** retrieval on any uploaded PDF, with **cross-encoder reranking**, **extractive answer summaries**, and a side-by-side method comparison.
+Compare **Keyword**, **Semantic**, and **Hybrid** search on any PDF—in one Streamlit app. Upload a document, ask a question, and see which retrieval strategy surfaces the best passages, with **cross-encoder reranking** and an **extractive summary** built only from text in your file.
 
-| | |
-|---|---|
-| **Repository** | [github.com/jenniferlinet/rteb](https://github.com/jenniferlinet/rteb) |
-| **Live demo** | Deploy via [Streamlit Community Cloud](DEPLOY.md) — add your `*.streamlit.app` URL here after deploy |
-| **Stack** | Streamlit · scikit-learn · LangChain · Hugging Face (embeddings + cross-encoder) |
+**Repository:** [github.com/jenniferlinet/rteb](https://github.com/jenniferlinet/rteb)
 
 ---
 
-## Latest changes
+## Table of contents
 
-| Area | What changed |
-|------|----------------|
-| **No paid APIs** | Removed Azure OpenAI. Relevance uses a free **cross-encoder** (`ms-marco-MiniLM-L-6-v2`) instead of GPT/Claude. |
-| **Better retrieval** | Two-stage pipeline: retrieve top **20** candidates → **rerank** → show top **k**. Normalized hybrid of TF-IDF + semantic cosine similarity. |
-| **Readable answers** | **Extractive summary** (best PDF sentences only) + **best matching passage** (verbatim chunk). |
-| **Method comparison** | Simple **3-column** view: average match (1–5), strong passages count, recommended winner — no charts. |
-| **Any PDF** | Upload-driven; text normalization (e.g. `fi` ligatures); chunk size **700** / overlap **150**. |
-| **Cloud deploy** | Streamlit Cloud–ready: `RTEB_CLOUD=1` uses lighter embeddings (`all-MiniLM-L6-v2`), CPU PyTorch in `requirements.txt`, lazy model load on first query. |
-| **Security** | `.gitignore` excludes uploaded PDFs, FAISS indexes, and secrets — safe for public GitHub. |
-
----
-
-## How it works
-
-```
-PDF upload → text extract & chunk
-       ↓
-Query → Keyword / Semantic / Hybrid (top-20 candidates each)
-       ↓
-Cross-encoder rerank → top-k passages
-       ↓
-Extractive summary + per-passage scores + 3-way comparison
-```
-
-### Retrieval methods
-
-| Method | Idea | Best for |
-|--------|------|----------|
-| **Keyword** | TF-IDF + cosine similarity | Exact phrases, error messages, names |
-| **Semantic** | Sentence embeddings (`all-mpnet-base-v2` locally, MiniLM on cloud) | Paraphrases, different wording |
-| **Hybrid** | 50/50 normalized keyword + semantic | General questions (default choice) |
-
-### Relevance score (1–5)
-
-Cross-encoder scores each query–passage pair. Scores are mapped to 1–5 within the result set, with a short **analysis** (match strength, similarities, shared terms).
-
-| Score | Meaning |
-|-------|---------|
-| **5** | Directly answers the question |
-| **4** | Clearly relevant |
-| **3** | Related but incomplete |
-| **2** | Weak link |
-| **1** | Not useful for the question |
+- [What this project does](#what-this-project-does)
+- [Who it is for](#who-it-is-for)
+- [Quick start](#quick-start)
+- [User guide](#user-guide)
+- [Understanding the results](#understanding-the-results)
+- [How retrieval works](#how-retrieval-works)
+- [Configuration](#configuration)
+- [Deploy online](#deploy-online)
+- [Project structure](#project-structure)
+- [Troubleshooting](#troubleshooting)
+- [Limitations & privacy](#limitations--privacy)
+- [Tech stack](#tech-stack)
+- [License](#license)
 
 ---
 
-## Features
+## What this project does
 
-- PDF upload and indexing (page/chunk/character stats)
-- Three retrieval strategies on the **same query**
-- Cross-encoder reranking for stable ranking
-- Extractive answer summary (no hallucinated facts)
-- Plain-language comparison: Keyword vs Semantic vs Hybrid
-- Optional hosting on **Streamlit Community Cloud** ([DEPLOY.md](DEPLOY.md))
+RTEB is an **information retrieval playground** for PDFs:
+
+1. **Ingest** — Extract text from an uploaded PDF and split it into overlapping chunks.
+2. **Retrieve** — Run the same query through three strategies (keyword, semantic, hybrid).
+3. **Rerank** — Score candidate passages with a cross-encoder so the best chunks rise to the top.
+4. **Explain** — Show an extractive summary, the best verbatim passage, per-chunk scores, and a simple comparison of all three methods.
+
+No paid API keys are required. Models run locally (or on Streamlit Cloud with lighter defaults).
 
 ---
 
-## Local setup
+## Who it is for
 
-### 1. Clone
+- Students and developers learning **TF-IDF vs embeddings vs hybrid** retrieval  
+- Anyone building **RAG** who wants to see how retrieval choice affects results before adding a generator LLM  
+- Portfolio demos: upload a public PDF, ask questions, compare methods live  
+
+---
+
+## Quick start
+
+### Prerequisites
+
+- **Python 3.9+**
+- **pip**
+- Internet on first run (downloads Hugging Face models once)
+
+### Install and run
 
 ```bash
 git clone https://github.com/jenniferlinet/rteb.git
 cd rteb
-```
 
-### 2. Install
+python3 -m venv .venv
+source .venv/bin/activate          # Windows: .venv\Scripts\activate
 
-```bash
-python3 -m pip install -r requirements.txt
-```
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
 
-First run downloads embedding and reranker models (~500 MB–1 GB depending on models).
-
-### 3. Run
-
-```bash
 streamlit run main.py
 ```
 
-Open the URL shown (usually `http://localhost:8501`), upload a **text-based PDF**, and ask a specific question.
-
-### Optional environment variables
-
-Copy `.env.example` to `.env` only if you need overrides:
-
-| Variable | Purpose |
-|----------|---------|
-| `RTEB_CLOUD` | Set to `1` for lighter embeddings (Streamlit free tier) |
-| `EMBEDDING_MODEL` | Hugging Face embedding model id |
-| `RERANKER_MODEL` | Hugging Face cross-encoder model id |
+Open the URL Streamlit prints (usually **http://localhost:8501**).
 
 ---
 
-## Deploy (resume / LinkedIn)
+## User guide
 
-See **[DEPLOY.md](DEPLOY.md)** for Streamlit Community Cloud steps.
+### Step 1 — Upload a PDF
 
-Quick checklist:
+Use the **Upload a PDF document** control. The app needs a **text-based PDF** (you can select and copy text in Preview/Acrobat). Scanned pages without a text layer will not work unless you OCR them first.
 
-1. Push `main` to GitHub (no confidential PDFs in the repo).
-2. [share.streamlit.io](https://share.streamlit.io) → Create app → `main.py`.
-3. Secrets: `RTEB_CLOUD = "1"`.
-4. Add the public URL to this README, your resume, and LinkedIn Featured.
+After upload, check the line under the title:
 
-**Demo tip:** Use a public sample PDF only; visitors can upload their own file in the app.
+- **Pages**, **chunks**, and **characters extracted** should be greater than zero.
+
+### Step 2 — Ask a focused question
+
+Type a specific question—not a single vague word. Examples:
+
+- *How do I reset my password?*
+- *What are the data retention rules in section 4?*
+- *What does "permission denied" mean in the troubleshooting table?*
+
+### Step 3 — Choose settings
+
+| Control | Recommendation |
+|--------|----------------|
+| **Retrieval method** | Start with **Hybrid**; use **Keyword** for exact error codes or product names. |
+| **Top k** | **3** is a good default; increase if you want more passages. |
+
+### Step 4 — Read the output (top to bottom)
+
+1. **Extractive answer summary** — Short answer stitched from the best sentences in the PDF (nothing invented).
+2. **Best matching passage** — Full chunk with the highest rerank score for your selected method.
+3. **Comparison: Keyword vs Semantic vs Hybrid** — Three columns with average match (1–5), count of strong passages, and a **recommended method** for this query.
+4. **Retrieved passages** — Detailed cards with similarity, relevance score, verdict, and analysis.
+
+The **first query** after opening the app loads embedding and reranker models and may take **30 seconds to a few minutes** depending on your machine.
+
+---
+
+## Understanding the results
+
+### Relevance score (1–5)
+
+Scores come from a **cross-encoder** that judges how well each passage matches your question. They are **relative within that query’s results**—use them to compare passages and methods, not as absolute truth.
+
+| Score | Typical meaning |
+|------|------------------|
+| **5** | Directly addresses the question |
+| **4** | Clearly relevant |
+| **3** | Related but incomplete |
+| **2** | Weak connection |
+| **1** | Unlikely to help |
+
+Icons: ✅ (4–5), ⚠️ (3), ❌ (1–2).
+
+Always verify important facts in the **cited passage text**, not only the score.
+
+### Method comparison
+
+| Method | Idea | Try it when |
+|--------|------|-------------|
+| **Keyword** | TF-IDF + cosine similarity | Wording matches the document; error messages; names |
+| **Semantic** | Sentence embeddings + cosine similarity | You paraphrase; synonyms; different phrasing |
+| **Hybrid** | 50/50 blend of normalized keyword + semantic scores | General questions (default) |
+
+Each method pulls up to **20** candidates, then the **same cross-encoder** reranks them to top **k**.
+
+---
+
+## How retrieval works
+
+```text
+PDF upload
+    → extract text & chunk (700 chars, 150 overlap)
+    → normalize text (e.g. fi ligatures)
+
+User query
+    → Keyword / Semantic / Hybrid scores on all chunks
+    → top 20 candidates per method
+    → cross-encoder rerank
+    → top k passages + extractive summary + 3-way comparison
+```
+
+```mermaid
+flowchart LR
+  A[PDF upload] --> B[Text chunks]
+  Q[User query] --> C[Keyword]
+  Q --> D[Semantic]
+  Q --> E[Hybrid]
+  B --> C
+  B --> D
+  B --> E
+  C --> F[Reranker]
+  D --> F
+  E --> F
+  F --> G[Summary & comparison]
+```
+
+**Models (local defaults)**
+
+| Role | Model |
+|------|--------|
+| Embeddings | `all-mpnet-base-v2` |
+| Reranker | `cross-encoder/ms-marco-MiniLM-L-6-v2` |
+
+On **Streamlit Cloud**, set `RTEB_CLOUD=1` to use `all-MiniLM-L6-v2` for lower memory use.
+
+---
+
+## Configuration
+
+Defaults work without a `.env` file. To override, copy `.env.example` to `.env`:
+
+| Variable | Purpose |
+|----------|---------|
+| `RTEB_CLOUD` | `1` = smaller embedding model (recommended on free cloud hosting) |
+| `EMBEDDING_MODEL` | Hugging Face embedding model ID |
+| `RERANKER_MODEL` | Hugging Face cross-encoder model ID |
+
+On **Streamlit Community Cloud**, add secrets (see [DEPLOY.md](DEPLOY.md)):
+
+```toml
+RTEB_CLOUD = "1"
+```
+
+---
+
+## Deploy online
+
+Host a public demo for your portfolio (LinkedIn, resume):
+
+1. Push this repo to GitHub (never commit private PDFs or `.env`).
+2. Follow **[DEPLOY.md](DEPLOY.md)** — [Streamlit Community Cloud](https://share.streamlit.io), repo `jenniferlinet/rteb`, main file `main.py`.
+3. Add your `https://*.streamlit.app` link at the top of this README.
+
+**Demo tip:** Use only **non-confidential** sample PDFs on public hosts.
 
 ---
 
 ## Project structure
 
-```
+```text
 rteb/
-├── main.py                 # Streamlit app
-├── requirements.txt        # Python dependencies (CPU PyTorch)
-├── DEPLOY.md               # Streamlit Cloud guide
-├── .streamlit/
-│   ├── config.toml         # Theme & server settings
-│   └── secrets.toml.example
-├── .env.example            # Optional model overrides
-├── .gitignore              # PDFs, indexes, secrets
-└── README.md
+├── main.py                    # Streamlit app (UI + retrieval pipeline)
+├── requirements.txt           # Dependencies (CPU PyTorch)
+├── DEPLOY.md                  # Streamlit Cloud steps
+├── .env.example               # Optional environment variables
+├── .gitignore                 # Ignores uploads, indexes, secrets
+└── .streamlit/
+    ├── config.toml            # App theme & server settings
+    └── secrets.toml.example   # Example cloud secrets
 ```
 
 ---
 
-## Requirements
+## Troubleshooting
 
-See `requirements.txt`. Main libraries: `streamlit`, `sentence-transformers`, `langchain-huggingface`, `langchain-community`, `faiss-cpu`, `pypdf`, `scikit-learn`, `torch` (CPU).
-
----
-
-## Use cases
-
-- Compare IR strategies on course readings or papers  
-- Portfolio / interview demo for information retrieval  
-- Prototype document search before building a production RAG stack  
+| Problem | What to try |
+|---------|-------------|
+| **Zero chunks after upload** | PDF may be image-only; use a text-based PDF or OCR first. |
+| **Weak or irrelevant passages** | Ask a more specific question; try **Hybrid** or **Keyword**; use words from the document. |
+| **Slow first query** | Normal—models download and load once; later queries are faster. |
+| **App crashes on Streamlit Cloud** | Set secret `RTEB_CLOUD = "1"`; redeploy; avoid very large PDFs on free tier. |
+| **Scores feel “wrong”** | Treat scores as comparative; read the verbatim passage and summary. |
 
 ---
 
-## Notes
+## Limitations & privacy
 
-- **Text PDFs only** — scanned images need OCR first.  
-- **Large files** — very long PDFs are slower on free cloud tiers.  
-- **Answers are extractive** — the app quotes the document; it does not generate new facts.  
+- **Extractive only** — The app quotes the PDF; it does not generate new facts like ChatGPT.
+- **No OCR** — Scanned documents need preprocessing.
+- **Local/cloud storage** — Uploaded files are written to the server’s disk for processing; do not upload sensitive data to public deployments.
+- **`.gitignore`** excludes `uploaded_pdf.pdf`, `dbs/`, and `.env` — keep confidential files out of Git.
+
+---
+
+## Tech stack
+
+- [Streamlit](https://streamlit.io) — UI  
+- [scikit-learn](https://scikit-learn.org) — TF-IDF  
+- [LangChain](https://python.langchain.com) — PDF loading, splitting, Hugging Face embeddings  
+- [Sentence Transformers](https://www.sbert.net) — Cross-encoder reranking  
+- [PyTorch](https://pytorch.org) (CPU) — Model runtime  
+- [FAISS](https://github.com/facebookresearch/faiss) — Vector index utilities (optional index on disk)
 
 ---
 
 ## License
 
-MIT License
+MIT License — see [LICENSE](LICENSE) if present in the repository.
+
+---
+
+## Author
+
+**Jennifer Linet** — [GitHub @jenniferlinet](https://github.com/jenniferlinet)
+
+Questions or improvements? Open an issue or pull request on the repository.
