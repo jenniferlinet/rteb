@@ -1,175 +1,165 @@
-# 🔍 RTEB Retrieval Dashboard
+# RTEB Retrieval Dashboard
 
-> **Hybrid PDF retrieval — TF-IDF, semantic search, and cross-encoder reranking**
+**Hybrid PDF search** — compare **Keyword (TF-IDF)**, **Semantic (embeddings)**, and **Hybrid** retrieval on any uploaded PDF, with **cross-encoder reranking**, **extractive answer summaries**, and a side-by-side method comparison.
 
-Interactive Streamlit app: upload a PDF, compare **Keyword**, **Semantic**, and **Hybrid** retrieval, and read **extractive answer summaries** grounded in the document.
-
-**Live demo:** *(add your Streamlit URL after deploy — see [DEPLOY.md](DEPLOY.md))*  
-**Source:** [github.com/jenniferlinet/rteb](https://github.com/jenniferlinet/rteb)
-
----
-
-## 📖 Overview
-
-Modern information retrieval systems fail when query wording differs from document text, or when meaning is implied rather than explicit. This project tackles that problem by implementing and comparing **three retrieval strategies** on PDF-based datasets, then evaluating results using an **LLM-based relevance scorer**.
-
-### Retrieval Methods
-
-| Method | Description | Strength | Weakness |
-|--------|-------------|----------|----------|
-| **Keyword Search (TF-IDF)** | Matches query words to document words | Fast, interpretable | Fails on vocabulary mismatch |
-| **Semantic Search** | Matches meaning using vector similarity (FAISS + Sentence-BERT) | Captures context & paraphrasing | Requires ML models |
-| **Hybrid Search** | Weighted fusion of keyword + semantic scores | Best of both worlds | Slight computation overhead |
+| | |
+|---|---|
+| **Repository** | [github.com/jenniferlinet/rteb](https://github.com/jenniferlinet/rteb) |
+| **Live demo** | Deploy via [Streamlit Community Cloud](DEPLOY.md) — add your `*.streamlit.app` URL here after deploy |
+| **Stack** | Streamlit · scikit-learn · LangChain · Hugging Face (embeddings + cross-encoder) |
 
 ---
 
-## 🏗️ System Architecture
+## Latest changes
 
-```
-User Query
-     ↓
-Vector Retrieval Engine (Keyword / Semantic / Hybrid)
-     ↓
-Top-K Retrieved Documents
-     ↓
-RTEB Evaluation (LLM Scoring via Azure OpenAI GPT-4.1)
-     ↓
-Dashboard with Metrics (Precision@K · nDCG · Avg LLM Score)
-```
+| Area | What changed |
+|------|----------------|
+| **No paid APIs** | Removed Azure OpenAI. Relevance uses a free **cross-encoder** (`ms-marco-MiniLM-L-6-v2`) instead of GPT/Claude. |
+| **Better retrieval** | Two-stage pipeline: retrieve top **20** candidates → **rerank** → show top **k**. Normalized hybrid of TF-IDF + semantic cosine similarity. |
+| **Readable answers** | **Extractive summary** (best PDF sentences only) + **best matching passage** (verbatim chunk). |
+| **Method comparison** | Simple **3-column** view: average match (1–5), strong passages count, recommended winner — no charts. |
+| **Any PDF** | Upload-driven; text normalization (e.g. `fi` ligatures); chunk size **700** / overlap **150**. |
+| **Cloud deploy** | Streamlit Cloud–ready: `RTEB_CLOUD=1` uses lighter embeddings (`all-MiniLM-L6-v2`), CPU PyTorch in `requirements.txt`, lazy model load on first query. |
+| **Security** | `.gitignore` excludes uploaded PDFs, FAISS indexes, and secrets — safe for public GitHub. |
 
 ---
 
-## ✨ Features
-
-- 📄 **PDF Ingestion** — Extracts and chunks text from uploaded PDF documents
-- 🔑 **TF-IDF Keyword Search** — Fast lexical matching with cosine similarity
-- 🧠 **Semantic Search** — Sentence-BERT (`all-mpnet-base-v2`) + FAISS nearest-neighbor retrieval
-- ⚖️ **Hybrid Search** — Configurable weighted fusion of keyword and semantic scores
-- 🤖 **LLM Relevance Scoring** — GPT-4.1 rates each retrieved chunk 1–5 with justification
-- 📊 **Evaluation Metrics** — Precision@K, nDCG@K, and Average LLM Score visualized in dashboard
-
----
-
-## 📐 Core Concepts
-
-### TF-IDF Keyword Search
-TF-IDF measures term importance relative to the document collection. Similarity is computed using **cosine similarity** between query and document vectors.
-
-### Semantic Search
-Uses **Sentence-BERT** (`all-mpnet-base-v2`) to encode text into high-dimensional vectors. **FAISS** enables efficient approximate nearest-neighbor search in vector space, capturing meaning even when vocabulary differs.
-
-### Hybrid Search
-Combines both scores with a configurable alpha weight:
+## How it works
 
 ```
-hybrid_score = α × semantic_score + (1 − α) × keyword_score
+PDF upload → text extract & chunk
+       ↓
+Query → Keyword / Semantic / Hybrid (top-20 candidates each)
+       ↓
+Cross-encoder rerank → top-k passages
+       ↓
+Extractive summary + per-passage scores + 3-way comparison
 ```
 
-### LLM-Based Relevance Scoring
+### Retrieval methods
+
+| Method | Idea | Best for |
+|--------|------|----------|
+| **Keyword** | TF-IDF + cosine similarity | Exact phrases, error messages, names |
+| **Semantic** | Sentence embeddings (`all-mpnet-base-v2` locally, MiniLM on cloud) | Paraphrases, different wording |
+| **Hybrid** | 50/50 normalized keyword + semantic | General questions (default choice) |
+
+### Relevance score (1–5)
+
+Cross-encoder scores each query–passage pair. Scores are mapped to 1–5 within the result set, with a short **analysis** (match strength, similarities, shared terms).
 
 | Score | Meaning |
 |-------|---------|
-| **5** | Highly relevant — directly answers the query |
-| **4** | Relevant but may lack detail |
-| **3** | Partially relevant / related but imprecise |
-| **2** | Weak relevance |
-| **1** | Irrelevant |
+| **5** | Directly answers the question |
+| **4** | Clearly relevant |
+| **3** | Related but incomplete |
+| **2** | Weak link |
+| **1** | Not useful for the question |
 
 ---
 
-## 📊 Evaluation Metrics
+## Features
 
-| Metric | Purpose |
-|--------|---------|
-| **Precision@K** | Proportion of relevant documents in top-K results |
-| **nDCG@K** | Ranking quality — rewards placing relevant docs higher |
-| **Average LLM Score** | Overall quality of retrieved results |
+- PDF upload and indexing (page/chunk/character stats)
+- Three retrieval strategies on the **same query**
+- Cross-encoder reranking for stable ranking
+- Extractive answer summary (no hallucinated facts)
+- Plain-language comparison: Keyword vs Semantic vs Hybrid
+- Optional hosting on **Streamlit Community Cloud** ([DEPLOY.md](DEPLOY.md))
 
 ---
 
-## ⚙️ Setup & Installation
+## Local setup
 
-### 1. Clone the Repository
+### 1. Clone
 
 ```bash
 git clone https://github.com/jenniferlinet/rteb.git
-cd rteb-retrieval-dashboard
+cd rteb
 ```
 
-### 2. Install Dependencies
+### 2. Install
 
 ```bash
-pip install -r requirements.txt
+python3 -m pip install -r requirements.txt
 ```
 
-### 3. Configure Environment Variables
+First run downloads embedding and reranker models (~500 MB–1 GB depending on models).
 
-Create a `.env` file in the project root:
-
-```env
-AZURE_OPENAI_API_KEY=your_key
-AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com
-AZURE_OPENAI_API_VERSION=2024-12-01-preview
-AZURE_DEPLOYMENT_NAME=your-deployment-name
-```
-
-### 4. Run the Dashboard
+### 3. Run
 
 ```bash
 streamlit run main.py
 ```
 
----
+Open the URL shown (usually `http://localhost:8501`), upload a **text-based PDF**, and ask a specific question.
 
-## 📦 Requirements
+### Optional environment variables
 
-```
-streamlit
-numpy
-sentence-transformers
-langchain-huggingface
-langchain-community
-langchain-text-splitters
-faiss-cpu
-pypdf
-openai>=1.40.0
-scikit-learn
-python-dotenv
-```
+Copy `.env.example` to `.env` only if you need overrides:
+
+| Variable | Purpose |
+|----------|---------|
+| `RTEB_CLOUD` | Set to `1` for lighter embeddings (Streamlit free tier) |
+| `EMBEDDING_MODEL` | Hugging Face embedding model id |
+| `RERANKER_MODEL` | Hugging Face cross-encoder model id |
 
 ---
 
-## 🧩 Use Cases
+## Deploy (resume / LinkedIn)
 
-- 🔎 **Enterprise Knowledge Retrieval** — Search internal documents and wikis
-- 💬 **Document QA Systems** — Answer questions from large PDF corpora
-- 🤖 **Chatbot Backends** — Ground LLM responses in retrieved context
-- 🎓 **LMS Assistants** — Help students find relevant course material
-- 🔬 **IR Research** — Benchmark retrieval strategies on custom datasets
+See **[DEPLOY.md](DEPLOY.md)** for Streamlit Community Cloud steps.
+
+Quick checklist:
+
+1. Push `main` to GitHub (no confidential PDFs in the repo).
+2. [share.streamlit.io](https://share.streamlit.io) → Create app → `main.py`.
+3. Secrets: `RTEB_CLOUD = "1"`.
+4. Add the public URL to this README, your resume, and LinkedIn Featured.
+
+**Demo tip:** Use a public sample PDF only; visitors can upload their own file in the app.
 
 ---
 
-## 📁 Project Structure
+## Project structure
 
 ```
-rteb-retrieval-dashboard/
-├── app.py                 # Main Streamlit dashboard
-├── requirements.txt       # Python dependencies
-├── .env                   # API keys (not committed)
-├── .env.example           # Template for environment variables
+rteb/
+├── main.py                 # Streamlit app
+├── requirements.txt        # Python dependencies (CPU PyTorch)
+├── DEPLOY.md               # Streamlit Cloud guide
+├── .streamlit/
+│   ├── config.toml         # Theme & server settings
+│   └── secrets.toml.example
+├── .env.example            # Optional model overrides
+├── .gitignore              # PDFs, indexes, secrets
 └── README.md
 ```
 
 ---
 
-## ⚠️ Notes
+## Requirements
 
-- Make sure your Azure OpenAI resource has access to **GPT-4.1** and the deployment name matches `AZURE_DEPLOYMENT_NAME` in your `.env`.
-- FAISS runs on CPU by default (`faiss-cpu`). For large corpora, consider `faiss-gpu`.
-- The first run will download the Sentence-BERT model (~420 MB).
+See `requirements.txt`. Main libraries: `streamlit`, `sentence-transformers`, `langchain-huggingface`, `langchain-community`, `faiss-cpu`, `pypdf`, `scikit-learn`, `torch` (CPU).
 
 ---
 
-## 📄 License
+## Use cases
 
-This project is licensed under the MIT License.
+- Compare IR strategies on course readings or papers  
+- Portfolio / interview demo for information retrieval  
+- Prototype document search before building a production RAG stack  
+
+---
+
+## Notes
+
+- **Text PDFs only** — scanned images need OCR first.  
+- **Large files** — very long PDFs are slower on free cloud tiers.  
+- **Answers are extractive** — the app quotes the document; it does not generate new facts.  
+
+---
+
+## License
+
+MIT License
