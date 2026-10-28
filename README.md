@@ -4,6 +4,7 @@ Compare **Keyword**, **Semantic**, and **Hybrid** search on any PDF—in one Str
 
 **Repository:** [github.com/jenniferlinet/rteb](https://github.com/jenniferlinet/rteb)
 
+**Live demo:** (https://rtebdashboard.streamlit.app/)
 ---
 
 ## Table of contents
