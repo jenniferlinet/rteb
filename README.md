@@ -1,175 +1,269 @@
-# 🔍 RTEB Retrieval Dashboard
+# RTEB Retrieval Dashboard
 
-> **Hybrid PDF retrieval — TF-IDF, semantic search, and cross-encoder reranking**
+Compare **Keyword**, **Semantic**, and **Hybrid** search on any PDF—in one Streamlit app. Upload a document, ask a question, and see which retrieval strategy surfaces the best passages, with **cross-encoder reranking** and an **extractive summary** built only from text in your file.
 
-Interactive Streamlit app: upload a PDF, compare **Keyword**, **Semantic**, and **Hybrid** retrieval, and read **extractive answer summaries** grounded in the document.
-
-**Live demo:** *(add your Streamlit URL after deploy — see [DEPLOY.md](DEPLOY.md))*  
-**Source:** [github.com/jenniferlinet/rteb](https://github.com/jenniferlinet/rteb)
+**Repository:** [github.com/jenniferlinet/rteb](https://github.com/jenniferlinet/rteb)
 
 ---
 
-## 📖 Overview
+## Table of contents
 
-Modern information retrieval systems fail when query wording differs from document text, or when meaning is implied rather than explicit. This project tackles that problem by implementing and comparing **three retrieval strategies** on PDF-based datasets, then evaluating results using an **LLM-based relevance scorer**.
-
-### Retrieval Methods
-
-| Method | Description | Strength | Weakness |
-|--------|-------------|----------|----------|
-| **Keyword Search (TF-IDF)** | Matches query words to document words | Fast, interpretable | Fails on vocabulary mismatch |
-| **Semantic Search** | Matches meaning using vector similarity (FAISS + Sentence-BERT) | Captures context & paraphrasing | Requires ML models |
-| **Hybrid Search** | Weighted fusion of keyword + semantic scores | Best of both worlds | Slight computation overhead |
-
----
-
-## 🏗️ System Architecture
-
-```
-User Query
-     ↓
-Vector Retrieval Engine (Keyword / Semantic / Hybrid)
-     ↓
-Top-K Retrieved Documents
-     ↓
-RTEB Evaluation (LLM Scoring via Azure OpenAI GPT-4.1)
-     ↓
-Dashboard with Metrics (Precision@K · nDCG · Avg LLM Score)
-```
+- [What this project does](#what-this-project-does)
+- [Who it is for](#who-it-is-for)
+- [Quick start](#quick-start)
+- [User guide](#user-guide)
+- [Understanding the results](#understanding-the-results)
+- [How retrieval works](#how-retrieval-works)
+- [Configuration](#configuration)
+- [Deploy online](#deploy-online)
+- [Project structure](#project-structure)
+- [Troubleshooting](#troubleshooting)
+- [Limitations & privacy](#limitations--privacy)
+- [Tech stack](#tech-stack)
+- [License](#license)
 
 ---
 
-## ✨ Features
+## What this project does
 
-- 📄 **PDF Ingestion** — Extracts and chunks text from uploaded PDF documents
-- 🔑 **TF-IDF Keyword Search** — Fast lexical matching with cosine similarity
-- 🧠 **Semantic Search** — Sentence-BERT (`all-mpnet-base-v2`) + FAISS nearest-neighbor retrieval
-- ⚖️ **Hybrid Search** — Configurable weighted fusion of keyword and semantic scores
-- 🤖 **LLM Relevance Scoring** — GPT-4.1 rates each retrieved chunk 1–5 with justification
-- 📊 **Evaluation Metrics** — Precision@K, nDCG@K, and Average LLM Score visualized in dashboard
+RTEB is an **information retrieval playground** for PDFs:
 
----
+1. **Ingest** — Extract text from an uploaded PDF and split it into overlapping chunks.
+2. **Retrieve** — Run the same query through three strategies (keyword, semantic, hybrid).
+3. **Rerank** — Score candidate passages with a cross-encoder so the best chunks rise to the top.
+4. **Explain** — Show an extractive summary, the best verbatim passage, per-chunk scores, and a simple comparison of all three methods.
 
-## 📐 Core Concepts
-
-### TF-IDF Keyword Search
-TF-IDF measures term importance relative to the document collection. Similarity is computed using **cosine similarity** between query and document vectors.
-
-### Semantic Search
-Uses **Sentence-BERT** (`all-mpnet-base-v2`) to encode text into high-dimensional vectors. **FAISS** enables efficient approximate nearest-neighbor search in vector space, capturing meaning even when vocabulary differs.
-
-### Hybrid Search
-Combines both scores with a configurable alpha weight:
-
-```
-hybrid_score = α × semantic_score + (1 − α) × keyword_score
-```
-
-### LLM-Based Relevance Scoring
-
-| Score | Meaning |
-|-------|---------|
-| **5** | Highly relevant — directly answers the query |
-| **4** | Relevant but may lack detail |
-| **3** | Partially relevant / related but imprecise |
-| **2** | Weak relevance |
-| **1** | Irrelevant |
+No paid API keys are required. Models run locally (or on Streamlit Cloud with lighter defaults).
 
 ---
 
-## 📊 Evaluation Metrics
+## Who it is for
 
-| Metric | Purpose |
-|--------|---------|
-| **Precision@K** | Proportion of relevant documents in top-K results |
-| **nDCG@K** | Ranking quality — rewards placing relevant docs higher |
-| **Average LLM Score** | Overall quality of retrieved results |
+- Students and developers learning **TF-IDF vs embeddings vs hybrid** retrieval  
+- Anyone building **RAG** who wants to see how retrieval choice affects results before adding a generator LLM  
+- Portfolio demos: upload a public PDF, ask questions, compare methods live  
 
 ---
 
-## ⚙️ Setup & Installation
+## Quick start
 
-### 1. Clone the Repository
+### Prerequisites
+
+- **Python 3.9+**
+- **pip**
+- Internet on first run (downloads Hugging Face models once)
+
+### Install and run
 
 ```bash
 git clone https://github.com/jenniferlinet/rteb.git
-cd rteb-retrieval-dashboard
-```
+cd rteb
 
-### 2. Install Dependencies
+python3 -m venv .venv
+source .venv/bin/activate          # Windows: .venv\Scripts\activate
 
-```bash
-pip install -r requirements.txt
-```
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
 
-### 3. Configure Environment Variables
-
-Create a `.env` file in the project root:
-
-```env
-AZURE_OPENAI_API_KEY=your_key
-AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com
-AZURE_OPENAI_API_VERSION=2024-12-01-preview
-AZURE_DEPLOYMENT_NAME=your-deployment-name
-```
-
-### 4. Run the Dashboard
-
-```bash
 streamlit run main.py
 ```
 
+Open the URL Streamlit prints (usually **http://localhost:8501**).
+
 ---
 
-## 📦 Requirements
+## User guide
 
+### Step 1 — Upload a PDF
+
+Use the **Upload a PDF document** control. The app needs a **text-based PDF** (you can select and copy text in Preview/Acrobat). Scanned pages without a text layer will not work unless you OCR them first.
+
+After upload, check the line under the title:
+
+- **Pages**, **chunks**, and **characters extracted** should be greater than zero.
+
+### Step 2 — Ask a focused question
+
+Type a specific question—not a single vague word. Examples:
+
+- *How do I reset my password?*
+- *What are the data retention rules in section 4?*
+- *What does "permission denied" mean in the troubleshooting table?*
+
+### Step 3 — Choose settings
+
+| Control | Recommendation |
+|--------|----------------|
+| **Retrieval method** | Start with **Hybrid**; use **Keyword** for exact error codes or product names. |
+| **Top k** | **3** is a good default; increase if you want more passages. |
+
+### Step 4 — Read the output (top to bottom)
+
+1. **Extractive answer summary** — Short answer stitched from the best sentences in the PDF (nothing invented).
+2. **Best matching passage** — Full chunk with the highest rerank score for your selected method.
+3. **Comparison: Keyword vs Semantic vs Hybrid** — Three columns with average match (1–5), count of strong passages, and a **recommended method** for this query.
+4. **Retrieved passages** — Detailed cards with similarity, relevance score, verdict, and analysis.
+
+The **first query** after opening the app loads embedding and reranker models and may take **30 seconds to a few minutes** depending on your machine.
+
+---
+
+## Understanding the results
+
+### Relevance score (1–5)
+
+Scores come from a **cross-encoder** that judges how well each passage matches your question. They are **relative within that query’s results**—use them to compare passages and methods, not as absolute truth.
+
+| Score | Typical meaning |
+|------|------------------|
+| **5** | Directly addresses the question |
+| **4** | Clearly relevant |
+| **3** | Related but incomplete |
+| **2** | Weak connection |
+| **1** | Unlikely to help |
+
+Icons: ✅ (4–5), ⚠️ (3), ❌ (1–2).
+
+Always verify important facts in the **cited passage text**, not only the score.
+
+### Method comparison
+
+| Method | Idea | Try it when |
+|--------|------|-------------|
+| **Keyword** | TF-IDF + cosine similarity | Wording matches the document; error messages; names |
+| **Semantic** | Sentence embeddings + cosine similarity | You paraphrase; synonyms; different phrasing |
+| **Hybrid** | 50/50 blend of normalized keyword + semantic scores | General questions (default) |
+
+Each method pulls up to **20** candidates, then the **same cross-encoder** reranks them to top **k**.
+
+---
+
+## How retrieval works
+
+```text
+PDF upload
+    → extract text & chunk (700 chars, 150 overlap)
+    → normalize text (e.g. fi ligatures)
+
+User query
+    → Keyword / Semantic / Hybrid scores on all chunks
+    → top 20 candidates per method
+    → cross-encoder rerank
+    → top k passages + extractive summary + 3-way comparison
 ```
-streamlit
-numpy
-sentence-transformers
-langchain-huggingface
-langchain-community
-langchain-text-splitters
-faiss-cpu
-pypdf
-openai>=1.40.0
-scikit-learn
-python-dotenv
+
+```mermaid
+flowchart LR
+  A[PDF upload] --> B[Text chunks]
+  Q[User query] --> C[Keyword]
+  Q --> D[Semantic]
+  Q --> E[Hybrid]
+  B --> C
+  B --> D
+  B --> E
+  C --> F[Reranker]
+  D --> F
+  E --> F
+  F --> G[Summary & comparison]
+```
+
+**Models (local defaults)**
+
+| Role | Model |
+|------|--------|
+| Embeddings | `all-mpnet-base-v2` |
+| Reranker | `cross-encoder/ms-marco-MiniLM-L-6-v2` |
+
+On **Streamlit Cloud**, set `RTEB_CLOUD=1` to use `all-MiniLM-L6-v2` for lower memory use.
+
+---
+
+## Configuration
+
+Defaults work without a `.env` file. To override, copy `.env.example` to `.env`:
+
+| Variable | Purpose |
+|----------|---------|
+| `RTEB_CLOUD` | `1` = smaller embedding model (recommended on free cloud hosting) |
+| `EMBEDDING_MODEL` | Hugging Face embedding model ID |
+| `RERANKER_MODEL` | Hugging Face cross-encoder model ID |
+
+On **Streamlit Community Cloud**, add secrets (see [DEPLOY.md](DEPLOY.md)):
+
+```toml
+RTEB_CLOUD = "1"
 ```
 
 ---
 
-## 🧩 Use Cases
+## Deploy online
 
-- 🔎 **Enterprise Knowledge Retrieval** — Search internal documents and wikis
-- 💬 **Document QA Systems** — Answer questions from large PDF corpora
-- 🤖 **Chatbot Backends** — Ground LLM responses in retrieved context
-- 🎓 **LMS Assistants** — Help students find relevant course material
-- 🔬 **IR Research** — Benchmark retrieval strategies on custom datasets
+Host a public demo for your portfolio (LinkedIn, resume):
+
+1. Push this repo to GitHub (never commit private PDFs or `.env`).
+2. Follow **[DEPLOY.md](DEPLOY.md)** — [Streamlit Community Cloud](https://share.streamlit.io), repo `jenniferlinet/rteb`, main file `main.py`.
+3. Add your `https://*.streamlit.app` link at the top of this README.
+
+**Demo tip:** Use only **non-confidential** sample PDFs on public hosts.
 
 ---
 
-## 📁 Project Structure
+## Project structure
 
+```text
+rteb/
+├── main.py                    # Streamlit app (UI + retrieval pipeline)
+├── requirements.txt           # Dependencies (CPU PyTorch)
+├── DEPLOY.md                  # Streamlit Cloud steps
+├── .env.example               # Optional environment variables
+├── .gitignore                 # Ignores uploads, indexes, secrets
+└── .streamlit/
+    ├── config.toml            # App theme & server settings
+    └── secrets.toml.example   # Example cloud secrets
 ```
-rteb-retrieval-dashboard/
-├── app.py                 # Main Streamlit dashboard
-├── requirements.txt       # Python dependencies
-├── .env                   # API keys (not committed)
-├── .env.example           # Template for environment variables
-└── README.md
-```
 
 ---
 
-## ⚠️ Notes
+## Troubleshooting
 
-- Make sure your Azure OpenAI resource has access to **GPT-4.1** and the deployment name matches `AZURE_DEPLOYMENT_NAME` in your `.env`.
-- FAISS runs on CPU by default (`faiss-cpu`). For large corpora, consider `faiss-gpu`.
-- The first run will download the Sentence-BERT model (~420 MB).
+| Problem | What to try |
+|---------|-------------|
+| **Zero chunks after upload** | PDF may be image-only; use a text-based PDF or OCR first. |
+| **Weak or irrelevant passages** | Ask a more specific question; try **Hybrid** or **Keyword**; use words from the document. |
+| **Slow first query** | Normal—models download and load once; later queries are faster. |
+| **App crashes on Streamlit Cloud** | Set secret `RTEB_CLOUD = "1"`; redeploy; avoid very large PDFs on free tier. |
+| **Scores feel “wrong”** | Treat scores as comparative; read the verbatim passage and summary. |
 
 ---
 
-## 📄 License
+## Limitations & privacy
 
-This project is licensed under the MIT License.
+- **Extractive only** — The app quotes the PDF; it does not generate new facts like ChatGPT.
+- **No OCR** — Scanned documents need preprocessing.
+- **Local/cloud storage** — Uploaded files are written to the server’s disk for processing; do not upload sensitive data to public deployments.
+- **`.gitignore`** excludes `uploaded_pdf.pdf`, `dbs/`, and `.env` — keep confidential files out of Git.
+
+---
+
+## Tech stack
+
+- [Streamlit](https://streamlit.io) — UI  
+- [scikit-learn](https://scikit-learn.org) — TF-IDF  
+- [LangChain](https://python.langchain.com) — PDF loading, splitting, Hugging Face embeddings  
+- [Sentence Transformers](https://www.sbert.net) — Cross-encoder reranking  
+- [PyTorch](https://pytorch.org) (CPU) — Model runtime  
+- [FAISS](https://github.com/facebookresearch/faiss) — Vector index utilities (optional index on disk)
+
+---
+
+## License
+
+MIT License — see [LICENSE](LICENSE) if present in the repository.
+
+---
+
+## Author
+
+**Jennifer Linet** — [GitHub @jenniferlinet](https://github.com/jenniferlinet)
+
+Questions or improvements? Open an issue or pull request on the repository.
